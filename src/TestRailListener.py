@@ -44,26 +44,36 @@ class TestRailListener(object):
     TESTRAIL_TEST_STATUS_ID_PASSED = 1
     TESTRAIL_TEST_STATUS_ID_FAILED = 5
 
-    def __init__(self, server, user, password, run_id, protocol='http', juggler_disable=None, update=None):
+    def __init__(self, server, user, password, run_id, protocol='http', juggler_disable=None, update=None, hosted=None, project_id=None, suite_id=None):
         """Listener initialization.
 
         *Args:*\n
             _server_ - name of TestRail server;\n
             _user_ - name of TestRail user;\n
             _password_ - password of TestRail user;\n
-            _run_id_ - ID of the test run;\n
+            _run_id_ - ID of the test run; If set to "new" a new run will be created (requires project_id and suite_id arguments)\n
             _protocol_ - connecting protocol to TestRail server: http or https;\n
             _juggler_disable_ - indicator to disable juggler logic; if exist, then juggler logic will be disabled;\n
-            _update_ - indicator to update test case in TestRail; if exist, then test will be updated.
+            _update_ - indicator to update test case in TestRail; if exist, then test will be updated.\n
+            _hosted_ - indicator to not use testrail in API url\n
+            _project_id - ID of the test project to create a run under, required if creating a new run.\n
+            _suite_id_ - ID of the test suite to create a test run for, required if creating a new run.
         """
-        testrail_url = '{protocol}://{server}/testrail/'.format(protocol=protocol, server=server)
+        if hosted:
+            testrail_url = '{protocol}://{server}/'.format(protocol=protocol, server=server)
+        else:
+            testrail_url = '{protocol}://{server}/testrail/'.format(protocol=protocol, server=server)
         self._url = testrail_url + 'index.php?/api/v2/'
         self._user = user
         self._password = password
         self.run_id = run_id
         self.juggler_disable = juggler_disable
         self.update = update
-        self.tr_client = TestRailAPIClient(server, user, password, run_id, protocol)
+        if hosted:
+            self.tr_client = TestRailAPIClient(server, user, password, run_id, protocol, hosted=hosted, project_id=project_id, suite_id=suite_id)
+        else:
+            self.tr_client = TestRailAPIClient(server, user, password, run_id, protocol, project_id=project_id, suite_id=suite_id)
+        self.run_id = self.tr_client.run_id
         self._vars_for_report_link = None
         logger.info('[TestRailListener] url: {testrail_url}'.format(testrail_url=testrail_url))
         logger.info('[TestRailListener] user: {user}'.format(user=user))
