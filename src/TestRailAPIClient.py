@@ -16,7 +16,7 @@ class TestRailAPIClient(object):
     1. [ http://docs.gurock.com/testrail-api2/introduction | Enable TestRail API]
     """
 
-    def __init__(self, server, user, password, run_id, protocol='http'):
+    def __init__(self, server, user, password, run_id, protocol='http', hosted=None, project_id=None, suite_id=None):
         """Create TestRailAPIClient instance.
 
         *Args:*\n
@@ -24,12 +24,23 @@ class TestRailAPIClient(object):
             _user_ - name of TestRail user;\n
             _password_ - password of TestRail user;\n
             _run_id_ - ID of the test run;\n
-            _protocol_ - connecting protocol to TestRail server: http or https.
+            _protocol_ - connecting protocol to TestRail server: http or https.\n
+            _hosted_ - indicator to not use testrail in API url.\n
+            _project_id - ID of the test project to create a run under, required if creating a new run.\n
+            _suite_id_ - ID of the test suite to create a test run for, required if creating a new run.
         """
-        self._url = '{protocol}://{server}/testrail/index.php?/api/v2/'.format(protocol=protocol, server=server)
+        if hosted:
+            self._url = '{protocol}://{server}/index.php?/api/v2/'.format(protocol=protocol, server=server)
+        else:
+            self._url = '{protocol}://{server}/testrail/index.php?/api/v2/'.format(protocol=protocol, server=server)
         self._user = user
         self._password = password
-        self.run_id = run_id
+        if run_id == "new":
+            run_details = self.add_run(project_id=project_id, suite_id=suite_id, include_all=True)
+            new_run_id = run_details['id']
+            self.run_id = new_run_id
+        else:
+            self.run_id = run_id
 
     def _send_post(self, uri, data):
         """Perform post request to TestRail.
@@ -329,6 +340,43 @@ class TestRailAPIClient(object):
         }
         for key in additional_data:
             data[key] = additional_data[key]
+
+        response = self._send_post(uri=uri, data=data)
+        return response
+
+    def add_run(self, project_id, suite_id=None, name=None, description=None, milestone_id=None, assignedto_id=None, include_all=None, case_ids=None):
+        """Creates a new test run.
+
+        *Args:* \n
+            _project_id_ - ID of the project to add the test run to
+            _suite_id_ - ID of the test suite for the test run
+            _name_ - Name to give to the test run
+            _description_ - Description of the test run
+            _milestone_id_ - ID of the milestone to link the test run to
+            _assignedto_id_ - ID of the user the test run should be assigned to
+            _include_all_ - boolean to determine if all test cases within the suite should be added
+            _case_ids_ -  comma separated list of test case IDs to use if the include all option is set to false
+
+        *Returns:*\n
+            Information about the new test run.
+        """
+
+        uri = 'add_run/{project_id}'.format(project_id=project_id)
+        data = {'name': name}
+        if suite_id is not None:
+            data['suite_id'] = suite_id
+        if name is not None:
+            data['name'] = name
+        if description is not None:
+            data['description'] = description
+        if milestone_id is not None:
+            data['milestone_id'] = milestone_id
+        if assignedto_id is not None:
+            data['assignedto_id'] = assignedto_id
+        if include_all is not None:
+            data['include_all'] = include_all
+        if case_ids is not None:
+            data['case_ids'] = case_ids
 
         response = self._send_post(uri=uri, data=data)
         return response
