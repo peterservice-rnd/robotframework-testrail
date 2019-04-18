@@ -18,7 +18,7 @@ with open(path.join(here, 'requirements.txt')) as f:
 
 setup(
     name='robotframework-testrail',
-    version='1.0.2',
+    version='1.0.3',
     description='Robot Framework library, listener and pre-run modifier for working with TestRail',
     long_description=long_description,
     long_description_content_type='text/markdown',
