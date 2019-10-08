@@ -1,9 +1,15 @@
 # -*- coding: utf-8 -*-
 
 from requests import post, get
+from typing import Any, cast, Dict, List, Optional, Sequence, Union
 
 DEFAULT_TESTRAIL_HEADERS = {'Content-Type': 'application/json'}
 TESTRAIL_STATUS_ID_PASSED = 1
+
+# custom types
+JsonDict = Dict[str, Any]  # noqa: E993
+JsonList = List[JsonDict]  # noqa: E993
+Id = Union[str, int]  # noqa: E993
 
 
 class TestRailAPIClient(object):
@@ -16,7 +22,7 @@ class TestRailAPIClient(object):
     1. [ http://docs.gurock.com/testrail-api2/introduction | Enable TestRail API]
     """
 
-    def __init__(self, server, user, password, run_id, protocol='http', hosted=None, project_id=None, suite_id=None):
+    def __init__(self, server: str, user: str, password: str, run_id: Id, protocol: str = 'http') -> None:
         """Create TestRailAPIClient instance.
 
         *Args:*\n
@@ -24,25 +30,14 @@ class TestRailAPIClient(object):
             _user_ - name of TestRail user;\n
             _password_ - password of TestRail user;\n
             _run_id_ - ID of the test run;\n
-            _protocol_ - connecting protocol to TestRail server: http or https.\n
-            _hosted_ - indicator to not use testrail in API url.\n
-            _project_id - ID of the test project to create a run under, required if creating a new run.\n
-            _suite_id_ - ID of the test suite to create a test run for, required if creating a new run.
+            _protocol_ - connecting protocol to TestRail server: http or https.
         """
-        if hosted:
-            self._url = '{protocol}://{server}/index.php?/api/v2/'.format(protocol=protocol, server=server)
-        else:
-            self._url = '{protocol}://{server}/testrail/index.php?/api/v2/'.format(protocol=protocol, server=server)
+        self._url = '{protocol}://{server}/testrail/index.php?/api/v2/'.format(protocol=protocol, server=server)
         self._user = user
         self._password = password
-        if run_id == "new":
-            run_details = self.add_run(project_id=project_id, suite_id=suite_id, include_all=True)
-            new_run_id = run_details['id']
-            self.run_id = new_run_id
-        else:
-            self.run_id = run_id
+        self.run_id = run_id
 
-    def _send_post(self, uri, data):
+    def _send_post(self, uri: str, data: Dict[str, Any]) -> Union[JsonList, JsonDict]:
         """Perform post request to TestRail.
 
         *Args:* \n
@@ -57,7 +52,8 @@ class TestRailAPIClient(object):
         response.raise_for_status()
         return response.json()
 
-    def _send_get(self, uri, headers=None, params=None):
+    def _send_get(self, uri: str, headers: Dict[str, str] = None,
+                  params: Dict[str, Any] = None) -> Union[JsonList, JsonDict]:
         """Perform get request to TestRail.
 
         *Args:* \n
@@ -73,7 +69,7 @@ class TestRailAPIClient(object):
         response.raise_for_status()
         return response.json()
 
-    def get_tests(self, run_id, status_ids=None):
+    def get_tests(self, run_id: Id, status_ids: Union[str, Sequence[int]] = None) -> JsonList:
         """Get tests from TestRail test run by run_id.
 
         *Args:* \n
@@ -90,9 +86,9 @@ class TestRailAPIClient(object):
             'status_id': status_ids
         }
         response = self._send_get(uri=uri, headers=DEFAULT_TESTRAIL_HEADERS, params=params)
-        return response
+        return cast(JsonList, response)
 
-    def get_results_for_case(self, run_id, case_id, limit=None):
+    def get_results_for_case(self, run_id: Id, case_id: Id, limit: int = None) -> JsonList:
         """Get results for case by run_id and case_id.
 
         *Args:* \n
@@ -108,9 +104,10 @@ class TestRailAPIClient(object):
             'limit': limit
         }
         response = self._send_get(uri=uri, headers=DEFAULT_TESTRAIL_HEADERS, params=params)
-        return response
+        return cast(JsonList, response)
 
-    def add_result_for_case(self, run_id, case_id, test_result_fields):
+    def add_result_for_case(self, run_id: Id, case_id: Id,
+                            test_result_fields: Dict[str, Union[str, int]]) -> None:
         """Add results for case in TestRail test run by run_id and case_id.
 
         *Supported request fields for test result:*\n
@@ -134,7 +131,7 @@ class TestRailAPIClient(object):
         uri = 'add_result_for_case/{run_id}/{case_id}'.format(run_id=run_id, case_id=case_id)
         self._send_post(uri, test_result_fields)
 
-    def get_statuses(self):
+    def get_statuses(self) -> JsonList:
         """Get test statuses information from TestRail.
 
         *Returns:* \n
@@ -142,9 +139,9 @@ class TestRailAPIClient(object):
         """
         uri = 'get_statuses'
         response = self._send_get(uri=uri, headers=DEFAULT_TESTRAIL_HEADERS)
-        return response
+        return cast(JsonList, response)
 
-    def update_case(self, case_id, request_fields):
+    def update_case(self, case_id: Id, request_fields: Dict[str, Union[str, int, None]]) -> JsonDict:
         """Update an existing test case in TestRail.
 
         *Supported request fields:*\n
@@ -170,9 +167,9 @@ class TestRailAPIClient(object):
         """
         uri = 'update_case/{case_id}'.format(case_id=case_id)
         response = self._send_post(uri, request_fields)
-        return response
+        return cast(JsonDict, response)
 
-    def get_status_id_by_status_label(self, status_label):
+    def get_status_id_by_status_label(self, status_label: str) -> int:
         """Get test status id by status label.
 
         *Args:* \n
@@ -187,7 +184,7 @@ class TestRailAPIClient(object):
                 return status['id']
         raise Exception(u"There is no status with label \'{}\' in TestRail".format(status_label))
 
-    def get_test_status_id_by_case_id(self, run_id, case_id):
+    def get_test_status_id_by_case_id(self, run_id: Id, case_id: Id) -> Optional[int]:
         """Get test last status id by case id.
         If there is no last test result returns None.
 
@@ -201,7 +198,7 @@ class TestRailAPIClient(object):
         last_case_result = self.get_results_for_case(run_id=run_id, case_id=case_id, limit=1)
         return last_case_result[0]['status_id'] if last_case_result else None
 
-    def get_project(self, project_id):
+    def get_project(self, project_id: Id) -> JsonDict:
         """Get project info by project id.
 
         *Args:* \n
@@ -212,9 +209,9 @@ class TestRailAPIClient(object):
         """
         uri = 'get_project/{project_id}'.format(project_id=project_id)
         response = self._send_get(uri=uri, headers=DEFAULT_TESTRAIL_HEADERS)
-        return response
+        return cast(JsonDict, response)
 
-    def get_suite(self, suite_id):
+    def get_suite(self, suite_id: Id) -> JsonDict:
         """Get suite info by suite id.
 
         *Args:* \n
@@ -225,9 +222,9 @@ class TestRailAPIClient(object):
         """
         uri = 'get_suite/{suite_id}'.format(suite_id=suite_id)
         response = self._send_get(uri=uri, headers=DEFAULT_TESTRAIL_HEADERS)
-        return response
+        return cast(JsonDict, response)
 
-    def get_section(self, section_id):
+    def get_section(self, section_id: Id) -> JsonDict:
         """Get section info by section id.
 
         *Args:* \n
@@ -238,23 +235,24 @@ class TestRailAPIClient(object):
         """
         uri = 'get_section/{section_id}'.format(section_id=section_id)
         response = self._send_get(uri=uri, headers=DEFAULT_TESTRAIL_HEADERS)
-        return response
+        return cast(JsonDict, response)
 
-    def add_section(self, project_id, name, suite_id=None, parent_id=None, description=None):
+    def add_section(self, project_id: Id, name: str, suite_id: Id = None, parent_id: Id = None,
+                    description: str = None) -> JsonDict:
         """Creates a new section.
 
         *Args:* \n
             _project_id_ - ID of the project;\n
+            _name_ - name of the section;\n
             _suite_id_ - ID of the test suite(ignored if the project is operating in single suite mode);\n
             _parent_id_ - ID of the parent section (to build section hierarchies);\n
-            _name_ - name of the section;\n
             _description_ - description of the section.
 
         *Returns:* \n
             New section information.
         """
         uri = 'add_section/{project_id}'.format(project_id=project_id)
-        data = {'name': name}
+        data: Dict[str, Union[int, str]] = {'name': name}
         if suite_id is not None:
             data['suite_id'] = suite_id
         if parent_id is not None:
@@ -263,10 +261,10 @@ class TestRailAPIClient(object):
             data['description'] = description
 
         response = self._send_post(uri=uri, data=data)
-        return response
+        return cast(JsonDict, response)
 
-    def get_sections(self, project_id, suite_id):
-        """Returns an existing section.
+    def get_sections(self, project_id: Id, suite_id: Id) -> JsonList:
+        """Returns existing sections.
 
         *Args:* \n
             _project_id_ - ID of the project;\n
@@ -277,9 +275,9 @@ class TestRailAPIClient(object):
         """
         uri = 'get_sections/{project_id}&suite_id={suite_id}'.format(project_id=project_id, suite_id=suite_id)
         response = self._send_get(uri=uri, headers=DEFAULT_TESTRAIL_HEADERS)
-        return response
+        return cast(JsonList, response)
 
-    def get_case(self, case_id):
+    def get_case(self, case_id: Id) -> JsonDict:
         """Get case info by case id.
 
         *Args:* \n
@@ -290,9 +288,9 @@ class TestRailAPIClient(object):
         """
         uri = 'get_case/{case_id}'.format(case_id=case_id)
         response = self._send_get(uri=uri, headers=DEFAULT_TESTRAIL_HEADERS)
-        return response
+        return cast(JsonDict, response)
 
-    def get_cases(self, project_id, suite_id=None, section_id=None):
+    def get_cases(self, project_id: Id, suite_id: Id = None, section_id: Id = None) -> JsonList:
         """Returns a list of test cases for a test suite or specific section in a test suite.
 
         *Args:* \n
@@ -311,9 +309,10 @@ class TestRailAPIClient(object):
             params['section_id'] = section_id
 
         response = self._send_get(uri=uri, headers=DEFAULT_TESTRAIL_HEADERS, params=params)
-        return response
+        return cast(JsonList, response)
 
-    def add_case(self, section_id, title, steps, description, refs, type_id, priority_id, **additional_data):
+    def add_case(self, section_id: Id, title: str, steps: List[Dict[str, str]], description: str, refs: str,
+                 type_id: Id, priority_id: Id, **additional_data: Any) -> JsonDict:
         """Creates a new test case.
 
         *Args:* \n
@@ -342,41 +341,4 @@ class TestRailAPIClient(object):
             data[key] = additional_data[key]
 
         response = self._send_post(uri=uri, data=data)
-        return response
-
-    def add_run(self, project_id, suite_id=None, name=None, description=None, milestone_id=None, assignedto_id=None, include_all=None, case_ids=None):
-        """Creates a new test run.
-
-        *Args:* \n
-            _project_id_ - ID of the project to add the test run to
-            _suite_id_ - ID of the test suite for the test run
-            _name_ - Name to give to the test run
-            _description_ - Description of the test run
-            _milestone_id_ - ID of the milestone to link the test run to
-            _assignedto_id_ - ID of the user the test run should be assigned to
-            _include_all_ - boolean to determine if all test cases within the suite should be added
-            _case_ids_ -  comma separated list of test case IDs to use if the include all option is set to false
-
-        *Returns:*\n
-            Information about the new test run.
-        """
-
-        uri = 'add_run/{project_id}'.format(project_id=project_id)
-        data = {'name': name}
-        if suite_id is not None:
-            data['suite_id'] = suite_id
-        if name is not None:
-            data['name'] = name
-        if description is not None:
-            data['description'] = description
-        if milestone_id is not None:
-            data['milestone_id'] = milestone_id
-        if assignedto_id is not None:
-            data['assignedto_id'] = assignedto_id
-        if include_all is not None:
-            data['include_all'] = include_all
-        if case_ids is not None:
-            data['case_ids'] = case_ids
-
-        response = self._send_post(uri=uri, data=data)
-        return response
+        return cast(JsonDict, response)
